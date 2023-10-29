@@ -1,0 +1,361 @@
+---
+title: "STAT0006 ICA 3"
+author: 'Student numbers: 21004594, 123456789, 123456789, 123456789'
+subtitle: Group 98
+output:
+  pdf_document: default
+  html_document: default
+header-includes:
+  \usepackage{float}
+  \floatplacement{figure}{H}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tinytex)
+library(tidyr)
+library(scales)
+library(MASS)
+getwd()
+ice_creams <- read.csv("ice_creams.csv")
+ice_creams = ice_creams %>% drop_na()
+summary(ice_creams$sales)
+```
+
+## Introduction to the data
+
+\noindent We have been asked by a supermarket chain to investigate the effects of different factors on weekly ice cream sales. Relevant data from the past five years across different stores were collected. The data-set contains three missing values (which we have decided to remove), and excluding those values, there are 311 observations of 11 variables.
+
+\noindent Other than the weekly ice creams sales (measured about a particular brand sold in a store in a single week), the covariates are: their brand; brand competitors; the distance to the nearest other supermarket store; the wholesale price of milk; the size of the store; the average weekly temperature at the store; the average weekly wind speed at the store; the year the sales were recorded; whether the week contained a national bank holiday; and whether there was a promotion running on this brand of ice cream that week.
+
+\noindent The mean weekly ice cream sales is 530.4 units, and the maximum recorded weekly sales is 2444 units. There were weeks where 0 sales were reported, which could be interesting to investigate.
+
+\noindent We now look at the effects different covariates have on weekly ice cream sales. We choose to omit the plot for milk price, wind, and year, as we found no clear relationship between the number of sales and these covariates.
+
+\newpage
+
+\noindent From Figure 1, we see that Brand A has on average the highest weekly sales, followed by Brand B, then Brand C. The respective means (indicated by the blue lines) are 752.9, 470.4 and 330.9 weekly sales hence at first glance, brand A seems to be selling considerably more than the two others. Finally, onw may note the 3 points at around 2300 weekly sales for brand A which are unusually large.
+
+```{r EDA1, echo=FALSE, warning=FALSE, fig.cap="Weekly ice cream sales for brands A, B and C", fig.align='center'}
+par(mfrow = c(1,3))
+boxplot(ice_creams$sales[ice_creams$brand == "BrandA"], main = "Ice Cream Brand A",
+     ylab = "Weekly Ice Cream Sales", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$brand == "BrandA"]), lty = 3, lwd = 1, col = "blue")
+boxplot(ice_creams$sales[ice_creams$brand == "BrandB"], main = "Ice Cream Brand B",
+     ylab = "Weekly Ice Cream Sales", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$brand == "BrandB"]), lty = 3, lwd = 1, col = "blue")
+boxplot(ice_creams$sales[ice_creams$brand == "BrandC"], main = "Ice Cream Brand C",
+     ylab = "Weekly Ice Cream Sales", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$brand == "BrandC"]), lty = 3, lwd = 1, col = "blue")
+```
+
+\newpage
+
+\noindent From Figure 2, we see that there is a general positive relationship between weekly ice cream sales and number of brand competitors. We observe that having 8 competitors stands out in weekly sales, with an average of 737.5 (denoted by the pink dot) which is notably greater than all other numbers of competitors. On the plot on the right, we notice a clear positive relationship between distance to the nearest supermarket and weekly ice cream sales. It seems that stores that are isolated have more weekly sales of ice creams.
+
+```{r EDA2, echo=FALSE, warning=FALSE, fig.width=10, fig.cap="Weekly ice cream sales against number of brand competitors (left) and against distance to the nearest supermarket (right).", fig.align='center'}
+par(mfrow=c(1,2))
+
+boxplot(sales ~ brand_competitors, data = ice_creams, xlab = "Number of Brand Competitors (units)", ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.xlab = 0.9, cex.ylab = 0.9)
+points(c(mean(ice_creams$sales[ice_creams$brand_competitors==3]),mean(ice_creams$sales[ice_creams$brand_competitors==4]),mean(ice_creams$sales[ice_creams$brand_competitors==5]),mean(ice_creams$sales[ice_creams$brand_competitors==6]),mean(ice_creams$sales[ice_creams$brand_competitors==7]),mean(ice_creams$sales[ice_creams$brand_competitors==8]),mean(ice_creams$sales[ice_creams$brand_competitors==9])), pch=16, col="hotpink", cex=1.5)
+
+plot(sales ~ distance, data = ice_creams, xlab = "Distance to nearest supermarket (miles)", ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.xlab = 0.9, cex.ylab = 0.9, col=alpha(1,0.7), pch=16)
+```
+
+\newpage
+
+\noindent In Figure 3, we see that on average (indicated by the blue line), the weekly sales of ice cream increases during a holiday. This might be biased because of the three unusually large weekly sales of ice cream which occur during holiday periods.
+
+```{r EDA3, echo=FALSE, fig.cap="Weekly ice cream sales with and without bank holidays.",fig.align='center'}
+
+par(mfrow=c(1,2))
+
+boxplot(ice_creams$sales[ice_creams$holiday == "Y"], main = "Holiday",
+     ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$holiday == "Y"]), lty = 3, lwd = 1, col = "blue")
+boxplot(ice_creams$sales[ice_creams$holiday == "N"], main = "No Holiday",
+     ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$holiday == "N"]), lty = 3, lwd = 1, col = "blue")
+
+```
+
+\newpage
+
+\noindent Figure 4 tells us that, on average, weekly sales of ice cream increases when promotions are in place. This suggests consumers tend to buy more ice creams when there are promotions for them.
+
+```{r EDA4, echo=FALSE, fig.cap="Weekly ice cream sales with and without a promotion.",fig.align='center'}
+
+par(mfrow=c(1,2))
+
+boxplot(ice_creams$sales[ice_creams$promotion == "Y"], main = "Promotion",
+     ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$holiday == "Y"]), lty = 3, lwd = 1, col = "blue")
+boxplot(ice_creams$sales[ice_creams$promotion == "N"], main = "No Promotion",
+     ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$holiday == "N"]), lty = 3, lwd = 1, col = "blue")
+```
+
+\newpage
+
+\noindent In Figure 5, we observe that the larger the store and the more weekly ice cream sales there are. This doesn't come as a surprise: large stores sell more ice cream that smaller ones.
+
+```{r EDA5, echo=FALSE, fig.cap="Weekly ice cream sales depending on the size of stores.",fig.align='center'}
+par(mfrow=c(1,3))
+boxplot(ice_creams$sales[ice_creams$store_type == "Small"], main = "Store Type: Small",
+     ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$store_type == "Small"]), lty = 3, lwd = 1, col = "blue")
+boxplot(ice_creams$sales[ice_creams$store_type == "Medium"], main = "Store Type: Medium",
+     ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$store_type == "Medium"]), lty = 3, lwd = 1, col = "blue")
+boxplot(ice_creams$sales[ice_creams$store_type == "Large"], main = "Store Type: Large",
+     ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.main = 0.9, cex.ylab = 0.9)
+abline(h = mean(ice_creams$sales[ice_creams$store_type == "Large"]), lty = 3, lwd = 1, col = "blue")
+```
+
+\newpage
+
+\noindent Finally, as seen in Figure 6, there is an apparent positive relationship between temperature and weekly ice-cream sales. This tells us that a consumers prefer buying ice-cream during hotter weather, which is coherent. Interestingly, the three weeks of unusually important ice creams sales occurred during cold weather as seen in the scatter plot below.
+
+```{r EDA6, echo=FALSE, warning=FALSE, fig.cap="Weekly ice cream sales against average weekly temperature",fig.align='center'}
+plot(sales ~ temperature, data = ice_creams, xlab = "Temperature (degrees Celsius)", ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.xlab = 0.9, cex.ylab = 0.9, col=alpha(1,0.7), pch=16)
+
+```
+
+\noindent In conclusion, seven of the ten covariates (all but milk price, year, and wind) seem to be possibly statistically significant in modelling weekly ice cream sales. Some considerations are still in order, such as finding suitable transformations for covariates, or including interactions to capture how each of those seven covariates affect ice cream sales.
+
+\newpage
+
+## Model building
+
+\noindent We start by building a basic general linear model using the seven covariates we have identified in the previous section.
+```{r model1, echo=FALSE, warning=FALSE, fig.align='center'}
+model1 <- lm(sales ~ brand + brand_competitors + distance + holiday + promotion + store_type + temperature, data = ice_creams)
+summary(model1)
+```
+\noindent The multiple R-squared of the above model is 0.6246. This means that the model only explains roughly 62.46% of the variability in the outcome variable. We wish to improve the fit of the model. To do so, we consider several things we can do, such as
+
+- Transforming the distance from nearest supermarket covariate,
+- Adding interaction to the model, such as:
+  - Interactions between brand competitors and brand,
+  - Interactions between distance and store size,
+  - Interactions between holiday and promotions,
+- Box-cox transformation of the outcome variable.
+
+\newpage
+
+### Transformation
+
+\noindent Looking back at the plot of weekly ice cream sales against distance from the nearest supermarket (which we have plotted again below), we observe that the spread of the points increases as the distance from the nearest supermarket increases. This indicates heteroskedasticity which is something we want to correct.
+
+```{r VarianceStabilize1, echo=FALSE, warning=FALSE, fig.align='center'}
+plot(sales ~ distance, data = ice_creams, xlab = "Distance to nearest supermarket (miles)", ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.xlab = 0.9, cex.ylab = 0.9, col=alpha(1,0.7), pch=16)
+```
+
+To resolve this, we try to find a variance stabilising transformation for the covariate of distance to nearest supermarket. From the plots below, we come to the conclusion that a log-transform yields the best results for fixing the non-constance of the variance of error terms.
+
+```{r VarianceStabilize2, echo=FALSE, warning=FALSE, fig.align='center'}
+par(mfrow=c(1,3))
+plot(ice_creams$sales ~ log(ice_creams$distance), xlab = "Log of distance", ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.xlab = 0.9, cex.ylab = 0.9, col=alpha(1,0.7), pch=16)
+plot(ice_creams$sales ~ sqrt(ice_creams$distance), xlab = "Square root of distance", ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.xlab = 0.9, cex.ylab = 0.9, col=alpha(1,0.7), pch=16)
+plot(ice_creams$sales ~ (ice_creams$distance)**2, xlab = "Square of distance", ylab = "Weekly Ice Cream Sales (units)", ylim = c(0, 2444), cex.xlab = 0.9, cex.ylab = 0.9, col=alpha(1,0.7), pch=16)
+```
+
+From now on we use the distance covariate transformed using the log function.
+
+\newpage
+
+### Interactions
+
+\noindent Now, we look at all the possible different interactions in the model. We first consider interactions between the brand and the number of brand competitors. We suppose that this interaction is statistically significant as most competition for ice-cream sales happens between competitors that are in similar brand spaces. In order to put in evidence the fact that competition is segmented between different brand spaces, we plot the interactions below. For each brand A, B and C, we see how the number of competitors there are affects the average weekly sales of ice cream.
+
+```{r interaction1_plot, echo=FALSE, fig.align='center'}
+#plot of the interactions between the brand and the brand competitors
+interaction.plot(x.factor = ice_creams$brand, trace.factor = ice_creams$brand_competitors, response = ice_creams$sales, fun = mean, xlab = "Brand", ylab = "Weekly Ice Cream Sales (units)", trace.label = "Brand Competitors", col = c("red","hotpink", "orange", "yellow","green", "blue", "purple"), lty = 4, lwd = 2, legend = F)
+legend(2.7, 1150, legend = c(3, 4, 5, 6, 7, 8, 9), col = c("red","hotpink", "orange", "yellow","green", "blue", "purple"), lty = 4)
+``` 
+
+\noindent Next, we run an ANOVA test to assess the statistical significance of the interaction.
+
+```{r interaction_check_brand&brand_competitor, echo=FALSE, fig.align='center'}
+model_test <- lm(sales ~ brand + brand_competitors + log(distance) + holiday + promotion + store_type + temperature, data = ice_creams)
+model3b <- lm(sales ~ brand + brand_competitors + log(distance) + holiday + promotion + store_type + temperature + brand*brand_competitors, data = ice_creams)
+anova(model3b, model_test)
+```
+
+\noindent At a $5\%$ level of significance, the $p$-value is $p=1.138\times10^{-9}$. Since $p=1.138\times10^{-9}$ is very small, there is sufficient evidence to reject the null hypothesis that the coefficient of the interaction term is 0. Hence, the interaction term provides a better description of weekly ice cream sales than the simple model without the interaction.
+
+From now on we add that interaction to our model.
+
+\noindent Next, we consider the interaction between store type and distance from the nearest supermarket. We posit that this interaction is statistically significant as larger supermarket stores are likely to service a larger population area, and other supermarkets as a result are likely positioned further away from larger stores to avoid competition.
+
+\noindent We plot the interactions below,
+```{r interaction2_plot, echo=FALSE, fig.align='center', warning=FALSE}
+#plot of the interactions
+par(mfrow=c(1,3))
+plot(log(ice_creams$distance[ice_creams$store_type=="Small"]), ice_creams$sales[ice_creams$store_type=="Small"],ylab="Weekly Ice Cream Sales (units)", xlab="Log of distance to nearest supermarket", main="Small Store")
+
+plot(log(ice_creams$distance[ice_creams$store_type=="Medium"]), ice_creams$sales[ice_creams$store_type=="Medium"],ylab="Weekly Ice Cream Sales (units)", xlab="Log of distance to nearest supermarket", main="Medium Store")
+
+plot(log(ice_creams$distance[ice_creams$store_type=="Large"]), ice_creams$sales[ice_creams$store_type=="Large"],ylab="Weekly Ice Cream Sales (units)", xlab="Log of distance to nearest supermarket", main="Large Store")
+```
+\noindent and run an ANOVA test to assess the statistical significance of the interaction.
+```{r interaction_check_distance&store_type, echo=FALSE, fig.align='center'}
+model3d <- lm(sales ~ brand + brand_competitors + log(distance) + holiday + promotion + store_type + temperature + brand*brand_competitors + distance*store_type, data = ice_creams)
+anova(model3d, model3b)
+```
+\noindent At a $5\%$ level of significance, the $p$-value is $p=2.2\times10^{-16}$. As $2.2\times10^{-16} < 0.05$, there is sufficient evidence to reject the null hypothesis that the coefficient of the interaction term is 0. Hence, the interaction term provides a substantially better description of weekly ice cream sales than the simple model without the interaction.
+
+Hence from now on, we also add this interaction in our model.
+
+\noindent Finally, we consider the interactions between bank holidays and ice-cream promotions. We theorise that the interaction is statistically significant as ice-cream promotions are possibly ran more often during holidays. 
+
+We start by ploting the interactions in the plot below, which shows the average weekly ice cream sales when there is a holiday or not given whether there is a promotion at the same time.
+
+```{r interaction3_plot, echo=FALSE, fig.align='center'}
+library(interactions)
+cat_plot(model3d, pred = promotion, modx = holiday, interval = TRUE)
+```
+\noindent and run an ANOVA test to measure the statistical significance of the interaction.
+```{r interaction_check_holiday&promotion, echo=FALSE, fig.align='center'}
+model3f <- lm(sales ~ brand + brand_competitors + log(distance) + holiday + promotion + store_type + temperature + brand*brand_competitors + distance*store_type + holiday*promotion, data = ice_creams)
+anova(model3f, model3d)
+```
+\noindent At a $5\%$ level of significance, the $p$-value is $p=0.07925$. As $p=0.07925 > 0.05$, there is insufficient evidence to reject the null hypothesis that the coefficient of the interaction term is 0. There is no evidence that the interaction term provides a better description of weekly ice cream sales than the simpler model without interaction.
+
+Thus we will not add this interaction to our model.
+
+\newpage
+
+### Box-Cox transformation
+
+\noindent Lastly, we consider the box-cox transformation of the weekly-ice cream sales, 
+```{r box-cox, echo=FALSE, fig.align='center'}
+boxcox(sales + 0.00000001 ~ brand + brand_competitors + log(distance) + holiday + promotion + store_type + temperature + brand * brand_competitors + distance * store_type, data = ice_creams)
+```
+and find that the log-likelihood is maximised at around $\lambda=0.5$. Hence it is suggested to transform the outcome using a power of 0.5, i.e. taking its square root, which is what we do from now on.
+
+\noindent Considering all these interactions, our model now becomes:
+```{r model2, echo=FALSE, fig.align='center'}
+model2 <- lm(sqrt(sales) ~ brand + brand_competitors + log(distance) + holiday + promotion + store_type + temperature + brand * brand_competitors + distance * store_type, data = ice_creams)
+summary(model2)
+```
+
+However, the p-value associated with the covariate holiday in the summary above suggests there is no evidence against removing it. This makes sense when looking back at the boxplots for the holiday covariate in the EDA: the difference in the means is explained by a few outliers for sales that were particularly large during holidays.
+
+</br>
+
+This yields our final model:
+
+```{r finalmodel, echo=FALSE, fig.align='center'}
+final_model <- lm(sqrt(sales) ~ brand + brand_competitors + log(distance) + promotion + store_type + temperature + brand * brand_competitors + distance * store_type, data = ice_creams)
+summary(final_model)
+```
+
+In comparison to the basic general linear model we built (multiple $R^{2}=0.6246$), our final model has considerably better fit (multiple $R^{2}=0.8377$). Our new model is able to explain $83.77\%$ of the variability in the weekly ice-cream sales. 
+
+\newpage
+
+## Model checking for final chosen model
+
+In order to check the final chosen model, we will check the assumptions made when building the model.
+
+```{r predict, echo=FALSE}
+final_model_stdres <- rstandard(final_model)
+final_model_fitted <- fitted(final_model)
+```
+
+
+#### Linearity
+
+First we check the linearity assumptions for the numerical covariates used in our final model. This is done by plotting the standardised residuals against each of them. As seen in both plots below, all the plots seem to be random scatters around 0 which shows that they do not provide any evidence that the linearity assumption is violated.
+
+```{r predict_plots, echo=FALSE, fig.align='center', fig.cap = "Standardised Residuals for numerical covariates"}
+par(mfrow=c(1,2))
+plot(log(ice_creams$distance), final_model_stdres, ylab = "Standardised Residuals", xlab = "Log of distance to nearest supermarket", pch = 16, cex = 0.9, col=alpha(1,0.5))
+abline(h=0, lty = 'dashed')
+plot(ice_creams$temperature, final_model_stdres, ylab = "Standardised Residuals", xlab = "Temperature", pch = 16, cex = 0.9, col=alpha(1,0.5))
+abline(h=0, lty = 'dashed')
+```
+
+\newpage
+
+#### Normality of the error term
+
+According to the model assumptions, the error components follow a normal distribution with mean zero and common variance. We check this by drawing a QQ-plot. From the figure below, we gather that there are no issues with normality. Indeed, the middle section closely fits the diagonal line. Only the tails deviate from that line but this is coherent since we have less information at the extremes.
+
+```{r qq-plot, echo=FALSE, fig.align='center',}
+par(mfrow=c(1,1))
+qqnorm(final_model_stdres, ylab = "Standardised Residuals", xlab = "Quantiles of N(0,1)", main = "QQ-plot for final model")
+qqline(final_model_stdres)
+```
+
+\newpage
+
+#### Homoscedasticity of the error term
+
+If the homoscedasticity assumption of the error term is verified, then by plotting the standardised residuals against the fitted values we expect to have no obvious systematic pattern. This is approximately the case here where the standardised residuals seem to be randomly scattered on either side of the line y=0. However, we can't say for sure that there is no systematic pattern, but the log-transform introduced earlier on alleviates this issue.
+
+```{r fitted_plot, echo=FALSE, fig.align='center'}
+plot(final_model_fitted, final_model_stdres, xlab="Fitted values", ylab="Standardised residuals", main = "Standardised residuals versus fitted values of final model", pch = 16, cex = 0.9, col=alpha(1,0.7))
+abline(a=0, b=0)
+```
+
+\newpage
+
+#### Independence
+
+While it may be useful to gain more insight as to how the data was collected, there is no reason to check the assumption about independence.
+
+All in all, the model checking above seems to indicate that our final model does not depart from any of the assumptions made when building it. 
+
+\newpage
+
+#### Global fit
+
+We assess the global fit of our model by plotting the observed values against the fitted values. The more precise the model and the closer the observed values should be to the fitted values, hence the points in the scatter plot below should be close to the line y=x.
+
+The first scatter plot is for the first basic model, and the second is for our final model.
+
+```{r best_fit_plot, echo=FALSE, fig.align='center', fig.cap = "Observed values against fitted values for initial and final models"}
+par(mfrow=c(1,2))
+plot(fitted(model1), ice_creams$sales, pch = 16, cex = 0.9, col=alpha(1,0.7))
+abline(a=0, b=1)
+plot(final_model_fitted**2, ice_creams$sales, pch = 16, cex = 0.9, col=alpha(1,0.7))
+abline(a=0, b=1)
+```
+
+We can clearly see that our final model is more precise than the initial one: the points are considerably closer to the line y=x.
+
+\newpage
+
+## Conclusion
+
+Having checked that the final model does not violate the assumptions, we can now look further into which  covariates affect the ice cream sales most.
+
+We observe that, on the contrary to what was first seen in the EDA, brand B and brand C actually result in more weekly sales when keeping all other covariates fixed (with brand C giving even more sales that brand B).
+
+At an even bigger extent, the store type greatly influences the sales. Indeed, they decrease when the store type goes from Large to Medium to Small, with the largest decrease being from Large to Medium.
+
+Finally, the interaction between store type and distance also considerably affects the number of sales. For Medium stores and even more for Small stores, the bigger the distance to the nearest other supermarket store and the more sales it will have.
+
+On a weaker level, brand competitors affects the sales of brand A positively, and negatively for brands B and C. Without surprise, promotions affect the sales positively and so does temperature (the higher the temperature the more sales on average).
+
+\newpage
+
+## Discussion of limitations 
+
+Although our model satisfied the model assumptions, we can't say for sure that this is the case; especially for the homoscedasticity of the error term. Departures form homoscedasticity does not mean our fitted equation isn't good, but it might affect the performance of standard hypothesis tests and confidence intervals. 
+
+As for the data, we know that linear regressions are sensitive to outliers. However, from the scatter plot of standardised residuals versus fitted values, we notice that there may be 3 such values in the data. These influential points might affect the precision of our model on the whole.
+
+```{r best_fit_plot, echo=FALSE, fig.align='center', fig.cap = "Observed values against fitted predict(final_model, data.frame(brand=c('BrandC'), brand_competitors = c(4), distance = c(1.24), promotion = c('Y'), store_type = c('Medium'), temperature = c(6.5)), interval = 'prediction')
+
+predict(final_model, data.frame(brand=c('BrandA'), brand_competitors = c(4), distance = c(1.24), promotion = c('Y'), store_type = c('Medium'), temperature = c(6.5)), interval = 'prediction')
+
+predict(final_model, data.frame(brand=c('BrandC'), brand_competitors = c(8), distance = c(0.75), promotion = c('Y'), store_type = c('Small'), temperature = c(5.5)), interval = 'prediction')
+
+predict(final_model, data.frame(brand=c('BrandA'), brand_competitors = c(8), distance = c(0.75), promotion = c('Y'), store_type = c('Small'), temperature = c(5.5)), interval = 'prediction')
+```
+
+
+**Total word count:** insert your word count here.
